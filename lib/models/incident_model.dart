@@ -31,7 +31,7 @@ class IncidentModel {
       'description': description,
       'imageUrl': imageUrl,
       'reporterId': reporterId,
-      'timestamp': timestamp.microsecondsSinceEpoch,
+      'timestamp': timestamp.millisecondsSinceEpoch,
       'resultImageUrl': resultImageUrl,
     };
   }
@@ -40,6 +40,7 @@ class IncidentModel {
     return IncidentModel(
       id: documentId,
       title: map['title'] ?? '',
+      location: map['location'] ?? '',
       description: map['description'] ?? '',
       imageUrl: map['imageUrl'] ?? '',
       reporterId: map['reporterId'] ?? '',
