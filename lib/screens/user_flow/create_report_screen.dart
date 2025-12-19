@@ -2,7 +2,6 @@ import 'dart:io';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:uuid/uuid.dart';
 import '../../models/incident_model.dart';
@@ -19,6 +18,16 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
   final _locationController = TextEditingController();
   final _descController = TextEditingController();
 
+  String _selectedCategory = "Hệ thống Điện";
+  final List<String> _categories = [
+    'Hệ thống Điện',
+    'Hệ thống Nước',
+    'Internet / Mạng',
+    'Cơ sở vật chất',
+    'Điều hòa / Tủ lạnh',
+    'Xe cộ',
+    'Khác'
+  ];
   File? _imageFile;
   String? _base64Image;
   bool _isUploading = false;
@@ -58,7 +67,7 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
 
       String incidentId = const Uuid().v4();
 
-      IncidentModel newIncident = IncidentModel(id: incidentId, title: _titleController.text, location: _locationController.text, description: _descController.text, imageUrl: _base64Image!, reporterId: "user_sdt_09999999", timestamp: DateTime.now(), status: 'Pending');
+      IncidentModel newIncident = IncidentModel(id: incidentId, title: _titleController.text, location: _locationController.text, description: _descController.text, imageUrl: _base64Image!, reporterId: "user_sdt_01", timestamp: DateTime.now(), status: 'Pending', category: _selectedCategory);
 
       await FirebaseFirestore.instance
             .collection('incidents')
@@ -130,6 +139,27 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
               ),
             ),
             const SizedBox(height: 20),
+
+            DropdownButtonFormField<String>(
+              value: _selectedCategory,
+              decoration: const InputDecoration(
+                labelText: "Phân loại sự cố",
+                prefixIcon: Icon(Icons.category),
+                border: OutlineInputBorder(),
+              ),
+              items: _categories.map((String category){
+                return DropdownMenuItem<String>(
+                  value: category,
+                  child: Text(category),
+                );
+              }).toList(),
+              onChanged: (newValue) {
+                setState(() {
+                  _selectedCategory = newValue!;
+                });
+              },
+            ),
+            const SizedBox(height: 12),
 
             TextField(
               controller: _titleController,
