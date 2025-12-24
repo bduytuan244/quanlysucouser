@@ -34,6 +34,7 @@ class IncidentModel {
       'imageUrl': imageUrl,
       'reporterId': reporterId,
       'timestamp': timestamp.millisecondsSinceEpoch,
+      'status': status,
       'resultImageUrl': resultImageUrl,
       'category': category,
     };
@@ -49,6 +50,7 @@ class IncidentModel {
       reporterId: map['reporterId'] ?? '',
       staffId: map['staffId'],
       timestamp: DateTime.fromMillisecondsSinceEpoch(map['timestamp'] ?? 0),
+      status: map['status'],
       resultImageUrl: map['resultImageUrl'],
       category: map['category'] ?? 'Khác',
     );
