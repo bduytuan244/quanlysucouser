@@ -4,7 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import '../../models/incident_model.dart';
 import 'create_report_screen.dart';
-
+import 'incident_detail_screen.dart';
 class HomeUserScreen extends StatefulWidget{
   const HomeUserScreen({super.key});
 
@@ -153,8 +153,10 @@ class _HomeUserScreenState extends State<HomeUserScreen> {
                   ),
 
                   onTap: () {
-                    //
-                  },
+                    Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => IncidentDetailScreen(incident: incident))
+                    );                  },
                 ),
               );
             },
