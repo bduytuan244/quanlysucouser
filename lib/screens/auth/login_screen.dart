@@ -19,8 +19,8 @@ class _LoginScreenState extends State<LoginScreen> {
     String inputPassword = _passwordController.text.trim();
 
     // 1. Kiểm tra nhập liệu cơ bản
-    if (inputEmail.isEmpty) {
-      _showError('Vui lòng nhập Email!');
+    if (inputEmail.isEmpty || inputPassword.isEmpty) {
+      _showError('Vui lòng nhập đầy đủ Email và Mật khẩu!');
       return;
     }
 
@@ -28,7 +28,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
     try {
       // 2. Tìm trong Database xem có nhân viên này không
-      // (Lưu ý: Chỉ tìm những người có role là 'technician')
       QuerySnapshot snapshot = await FirebaseFirestore.instance
           .collection('users')
           .where('email', isEqualTo: inputEmail)
@@ -39,19 +38,33 @@ class _LoginScreenState extends State<LoginScreen> {
       if (snapshot.docs.isNotEmpty) {
         // --- TÌM THẤY TÀI KHOẢN ---
         var userDoc = snapshot.docs.first;
-        bool isActive = userDoc.get('isActive') ?? true; // Mặc định là true nếu không thấy trường này
+        Map<String, dynamic> data = userDoc.data() as Map<String, dynamic>;
+
+        // --- BƯỚC KIỂM TRA MẬT KHẨU MỚI ---
+        // Lấy pass từ DB (nếu không có trường password thì mặc định là '123456')
+        String dbPassword = data['password'] ?? '123456';
+
+        // So sánh
+        if (inputPassword != dbPassword) {
+          _showError('Sai mật khẩu! Vui lòng kiểm tra lại.');
+          setState(() { _isLoading = false; });
+          return; // Dừng lại, không cho đăng nhập
+        }
+        // ------------------------------------
+
+        // Kiểm tra trạng thái hoạt động
+        bool isActive = data['isActive'] ?? true;
 
         if (isActive) {
-          // Tài khoản đang hoạt động -> Cho vào
+          // Tài khoản OK -> Cho vào
           _goToHome();
         } else {
-          // Tài khoản đã bị STAFF gạt tắt -> Chặn lại
+          // Tài khoản đã bị STAFF khóa
           _showError('Tài khoản này đã bị VÔ HIỆU HÓA. Vui lòng liên hệ quản lý!');
         }
       } else {
         // --- KHÔNG TÌM THẤY TRONG DB ---
-        // Để thuận tiện cho việc chấm bài/test nhanh, ta vẫn giữ lại
-        // tài khoản test cứng 'user'/'user' cũ
+        // Vẫn giữ backdoor 'user' để test nhanh nếu cần (hoặc bạn có thể xóa đoạn này đi nếu muốn bảo mật hoàn toàn)
         if (inputEmail == 'user') {
           _goToHome();
         } else {
@@ -61,7 +74,7 @@ class _LoginScreenState extends State<LoginScreen> {
     } catch (e) {
       _showError('Lỗi kết nối: $e');
     } finally {
-      setState(() { _isLoading = false; });
+      if (mounted) setState(() { _isLoading = false; });
     }
   }
 
@@ -89,7 +102,7 @@ class _LoginScreenState extends State<LoginScreen> {
       body: Center(
         child: Padding(
           padding: const EdgeInsets.all(24.0),
-          child: SingleChildScrollView( // Thêm cái này để không bị lỗi khi bàn phím hiện lên
+          child: SingleChildScrollView(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -118,7 +131,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   obscureText: true,
                   decoration: const InputDecoration(
                     labelText: 'Mật khẩu',
-                    hintText: 'Nhập bất kỳ (Mock Login)',
+                    hintText: 'Nhập mật khẩu của bạn', // Sửa hintText
                     prefixIcon: Icon(Icons.lock),
                     border: OutlineInputBorder(),
                   ),
