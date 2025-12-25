@@ -42,7 +42,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
         // --- BƯỚC KIỂM TRA MẬT KHẨU MỚI ---
         // Lấy pass từ DB (nếu không có trường password thì mặc định là '123456')
-        String dbPassword = data['password'] ?? '123456';
+        String dbPassword = data['password'];
 
         // So sánh
         if (inputPassword != dbPassword) {
