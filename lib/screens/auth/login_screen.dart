@@ -81,7 +81,11 @@ class _LoginScreenState extends State<LoginScreen> {
   void _goToHome() {
     Navigator.pushReplacement(
       context,
-      MaterialPageRoute(builder: (context) => const HomeUserScreen()),
+      MaterialPageRoute(
+        builder: (context) => HomeUserScreen(
+          userEmail: _emailController.text.trim(), // <--- TRUYỀN EMAIL VÀO ĐÂY
+        ),
+      ),
     );
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Đăng nhập thành công!')));
   }

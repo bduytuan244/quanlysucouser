@@ -5,14 +5,20 @@ import 'package:intl/intl.dart';
 import '../../models/incident_model.dart';
 import 'create_report_screen.dart';
 import 'incident_detail_screen.dart';
-class HomeUserScreen extends StatefulWidget{
-  const HomeUserScreen({super.key});
+import 'profile_screen.dart'; // Đảm bảo đã import file này
+
+class HomeUserScreen extends StatefulWidget {
+  // 1. Thêm biến để nhận Email từ màn hình Login
+  final String userEmail;
+
+  const HomeUserScreen({super.key, required this.userEmail});
 
   @override
   State<HomeUserScreen> createState() => _HomeUserScreenState();
 }
 
 class _HomeUserScreenState extends State<HomeUserScreen> {
+
   Color _getStatusColor(String status) {
     switch (status) {
       case 'Resolved':
@@ -50,20 +56,37 @@ class _HomeUserScreenState extends State<HomeUserScreen> {
         foregroundColor: Colors.white,
         automaticallyImplyLeading: false,
         actions: [
+          // 2. Thêm nút Profile để vào trang sửa thông tin
+          IconButton(
+            icon: const Icon(Icons.person),
+            tooltip: "Hồ sơ cá nhân",
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  // Truyền email sang màn hình Profile
+                  builder: (context) => ProfileScreen(userEmail: widget.userEmail),
+                ),
+              );
+            },
+          ),
+
+          // Nút đăng xuất (Giữ lại hoặc bỏ tùy bạn, vì trong Profile cũng có nút đăng xuất rồi)
           IconButton(
             icon: const Icon(Icons.logout),
+            tooltip: "Đăng xuất nhanh",
             onPressed: () => Navigator.pop(context),
           )
         ],
       ),
 
       body: StreamBuilder<QuerySnapshot>(
-        stream:  FirebaseFirestore.instance
+        stream: FirebaseFirestore.instance
             .collection('incidents')
             .orderBy('timestamp', descending: true)
             .snapshots(),
 
-        builder: (context, snapshot){
+        builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
@@ -85,7 +108,7 @@ class _HomeUserScreenState extends State<HomeUserScreen> {
           return ListView.builder(
             padding: const EdgeInsets.all(10),
             itemCount: documents.length,
-            itemBuilder: (context, index){
+            itemBuilder: (context, index) {
               final data = documents[index].data() as Map<String, dynamic>;
               final docId = documents[index].id;
 
@@ -101,12 +124,11 @@ class _HomeUserScreenState extends State<HomeUserScreen> {
                   contentPadding: const EdgeInsets.all(10),
                   leading: incident.imageUrl.isNotEmpty
                       ? ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(8),
                     child: (() {
-                      // Kiểm tra xem có phải ảnh Base64 không (thường rất dài và không bắt đầu bằng http)
+                      // Xử lý hiển thị ảnh (Base64 hoặc URL)
                       if (!incident.imageUrl.startsWith('http')) {
                         try {
-                          // Giải mã Base64 để hiện ảnh
                           return Image.memory(
                             base64Decode(incident.imageUrl),
                             width: 60, height: 60, fit: BoxFit.cover,
@@ -115,11 +137,10 @@ class _HomeUserScreenState extends State<HomeUserScreen> {
                           return const Icon(Icons.error);
                         }
                       } else {
-                        // Trường hợp cũ (nếu có link thật)
                         return Image.network(incident.imageUrl, width: 60, height: 60, fit: BoxFit.cover);
                       }
                     })(),
-                        )
+                  )
                       : const Icon(Icons.image_not_supported, size: 50, color: Colors.grey),
 
                   title: Text(
@@ -156,7 +177,8 @@ class _HomeUserScreenState extends State<HomeUserScreen> {
                     Navigator.push(
                         context,
                         MaterialPageRoute(builder: (context) => IncidentDetailScreen(incident: incident))
-                    );                  },
+                    );
+                  },
                 ),
               );
             },
