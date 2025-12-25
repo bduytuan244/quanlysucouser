@@ -18,7 +18,6 @@ class _LoginScreenState extends State<LoginScreen> {
     String inputEmail = _emailController.text.trim();
     String inputPassword = _passwordController.text.trim();
 
-    // 1. Kiểm tra nhập liệu cơ bản
     if (inputEmail.isEmpty || inputPassword.isEmpty) {
       _showError('Vui lòng nhập đầy đủ Email và Mật khẩu!');
       return;
@@ -27,7 +26,6 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() { _isLoading = true; });
 
     try {
-      // 2. Tìm trong Database xem có nhân viên này không
       QuerySnapshot snapshot = await FirebaseFirestore.instance
           .collection('users')
           .where('email', isEqualTo: inputEmail)
@@ -36,35 +34,25 @@ class _LoginScreenState extends State<LoginScreen> {
           .get();
 
       if (snapshot.docs.isNotEmpty) {
-        // --- TÌM THẤY TÀI KHOẢN ---
         var userDoc = snapshot.docs.first;
         Map<String, dynamic> data = userDoc.data() as Map<String, dynamic>;
 
-        // --- BƯỚC KIỂM TRA MẬT KHẨU MỚI ---
-        // Lấy pass từ DB (nếu không có trường password thì mặc định là '123456')
         String dbPassword = data['password'];
 
-        // So sánh
         if (inputPassword != dbPassword) {
           _showError('Sai mật khẩu! Vui lòng kiểm tra lại.');
           setState(() { _isLoading = false; });
-          return; // Dừng lại, không cho đăng nhập
+          return;
         }
-        // ------------------------------------
 
-        // Kiểm tra trạng thái hoạt động
         bool isActive = data['isActive'] ?? true;
 
         if (isActive) {
-          // Tài khoản OK -> Cho vào
           _goToHome();
         } else {
-          // Tài khoản đã bị STAFF khóa
           _showError('Tài khoản này đã bị VÔ HIỆU HÓA. Vui lòng liên hệ quản lý!');
         }
       } else {
-        // --- KHÔNG TÌM THẤY TRONG DB ---
-        // Vẫn giữ backdoor 'user' để test nhanh nếu cần (hoặc bạn có thể xóa đoạn này đi nếu muốn bảo mật hoàn toàn)
         if (inputEmail == 'user') {
           _goToHome();
         } else {
@@ -135,7 +123,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   obscureText: true,
                   decoration: const InputDecoration(
                     labelText: 'Mật khẩu',
-                    hintText: 'Nhập mật khẩu của bạn', // Sửa hintText
+                    hintText: 'Nhập mật khẩu của bạn',
                     prefixIcon: Icon(Icons.lock),
                     border: OutlineInputBorder(),
                   ),

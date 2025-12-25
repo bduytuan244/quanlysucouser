@@ -5,10 +5,9 @@ import 'package:intl/intl.dart';
 import '../../models/incident_model.dart';
 import 'create_report_screen.dart';
 import 'incident_detail_screen.dart';
-import 'profile_screen.dart'; // Đảm bảo đã import file này
+import 'profile_screen.dart';
 
 class HomeUserScreen extends StatefulWidget {
-  // 1. Thêm biến để nhận Email từ màn hình Login
   final String userEmail;
 
   const HomeUserScreen({super.key, required this.userEmail});
@@ -56,7 +55,6 @@ class _HomeUserScreenState extends State<HomeUserScreen> {
         foregroundColor: Colors.white,
         automaticallyImplyLeading: false,
         actions: [
-          // 2. Thêm nút Profile để vào trang sửa thông tin
           IconButton(
             icon: const Icon(Icons.person),
             tooltip: "Hồ sơ cá nhân",
@@ -64,14 +62,12 @@ class _HomeUserScreenState extends State<HomeUserScreen> {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  // Truyền email sang màn hình Profile
                   builder: (context) => ProfileScreen(userEmail: widget.userEmail),
                 ),
               );
             },
           ),
 
-          // Nút đăng xuất (Giữ lại hoặc bỏ tùy bạn, vì trong Profile cũng có nút đăng xuất rồi)
           IconButton(
             icon: const Icon(Icons.logout),
             tooltip: "Đăng xuất nhanh",
@@ -126,7 +122,6 @@ class _HomeUserScreenState extends State<HomeUserScreen> {
                       ? ClipRRect(
                     borderRadius: BorderRadius.circular(8),
                     child: (() {
-                      // Xử lý hiển thị ảnh (Base64 hoặc URL)
                       if (!incident.imageUrl.startsWith('http')) {
                         try {
                           return Image.memory(
