@@ -20,6 +20,18 @@ class IncidentDetailScreen extends StatefulWidget {
 
 class _IncidentDetailScreenState extends State<IncidentDetailScreen> {
   bool _isUpdating = false;
+  bool _hasCheckedInLocal = false;
+
+  @override
+  void initState() {
+    super.initState();
+    try {
+      var checkInTime = (widget.incident as dynamic).checkInTime;
+      _hasCheckedInLocal = checkInTime != null;
+    } catch (e) {
+      _hasCheckedInLocal = false;
+    }
+  }
 
   void _showFullImage(BuildContext context, String base64String) {
     if (base64String.isEmpty) return;
@@ -80,7 +92,6 @@ class _IncidentDetailScreenState extends State<IncidentDetailScreen> {
           .collection('incidents')
           .doc(widget.incident.id)
           .update({
-        'status': 'Processing',
         'checkInTime': DateTime.now().millisecondsSinceEpoch,
         'checkInLocation': {
           'latitude': position.latitude,
@@ -89,9 +100,11 @@ class _IncidentDetailScreenState extends State<IncidentDetailScreen> {
       });
 
       if (mounted) {
+        setState(() {
+          _hasCheckedInLocal = true;
+        });
         ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text("Đã Check-in thành công! Bắt đầu công việc.")));
-        Navigator.pop(context);
+            const SnackBar(content: Text("Đã Check-in! Vui lòng đợi Quản lý duyệt để bắt đầu.")));
       }
     } catch (e) {
       if (mounted) {
@@ -297,11 +310,15 @@ class _IncidentDetailScreenState extends State<IncidentDetailScreen> {
     String timeString = "N/A";
     try {
       DateTime date = widget.incident.timestamp;
-
       timeString = "${date.day}/${date.month}/${date.year} ${date.hour}:${date.minute.toString().padLeft(2, '0')}";
     } catch (e) {
       timeString = "Không xác định";
     }
+
+    bool isCheckedIn = _hasCheckedInLocal;
+    try {
+      if ((widget.incident as dynamic).checkInTime != null) isCheckedIn = true;
+    } catch (_) {}
 
     return Scaffold(
       appBar: AppBar(title: const Text("Chi tiết sự cố")),
@@ -364,9 +381,9 @@ class _IncidentDetailScreenState extends State<IncidentDetailScreen> {
                     _rowInfo(Icons.description, "Mô tả", widget.incident.description),
                     const Divider(),
                     _rowInfo(Icons.access_time, "Thời gian báo", timeString),
-                    if (widget.incident.status != 'Pending') ...[
+                    if (isCheckedIn) ...[
                       const Divider(),
-                      _rowInfo(Icons.timer, "Đã check-in", "Đã ghi nhận vị trí"),
+                      _rowInfo(Icons.timer, "Trạng thái", "Đã có mặt tại hiện trường"),
                     ]
                   ],
                 ),
@@ -378,19 +395,43 @@ class _IncidentDetailScreenState extends State<IncidentDetailScreen> {
               _buildRequestedMaterials(),
 
             if (!widget.isReadOnly) ...[
-              if (widget.incident.status == 'Pending')
-                SizedBox(
-                  width: double.infinity,
-                  height: 50,
-                  child: ElevatedButton.icon(
-                    onPressed: _isUpdating ? null : _handleCheckIn,
-                    icon: const Icon(Icons.location_on),
-                    label: _isUpdating
-                        ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                        : const Text("CHECK-IN VỊ TRÍ & BẮT ĐẦU LÀM"),
-                    style: ElevatedButton.styleFrom(backgroundColor: Colors.blueAccent, foregroundColor: Colors.white),
+
+              if (widget.incident.status == 'Pending') ...[
+                if (!isCheckedIn)
+                  SizedBox(
+                    width: double.infinity,
+                    height: 50,
+                    child: ElevatedButton.icon(
+                      onPressed: _isUpdating ? null : _handleCheckIn,
+                      icon: const Icon(Icons.location_on),
+                      label: _isUpdating
+                          ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                          : const Text("CHECK-IN VỊ TRÍ & BẮT ĐẦU LÀM"),
+                      style: ElevatedButton.styleFrom(backgroundColor: Colors.blueAccent, foregroundColor: Colors.white),
+                    ),
+                  )
+                else
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.orange[50],
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.orange.shade300),
+                    ),
+                    child: Column(
+                      children: const [
+                        Icon(Icons.hourglass_top, color: Colors.orange, size: 30),
+                        SizedBox(height: 8),
+                        Text(
+                          "Đã Check-in thành công.\nVui lòng đợi Ban Quản Lý bấm 'Tiếp nhận' để bắt đầu công việc.",
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: Colors.orange, fontWeight: FontWeight.bold),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
+              ],
 
               if (widget.incident.status == 'Processing') ...[
                 SizedBox(
