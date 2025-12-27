@@ -53,12 +53,9 @@ class _LoginScreenState extends State<LoginScreen> {
           _showError('Tài khoản này đã bị VÔ HIỆU HÓA. Vui lòng liên hệ quản lý!');
         }
       } else {
-        if (inputEmail == 'user') {
-          _goToHome();
-        } else {
           _showError('Email không tồn tại trong hệ thống!');
         }
-      }
+
     } catch (e) {
       _showError('Lỗi kết nối: $e');
     } finally {
@@ -71,7 +68,7 @@ class _LoginScreenState extends State<LoginScreen> {
       context,
       MaterialPageRoute(
         builder: (context) => HomeUserScreen(
-          userEmail: _emailController.text.trim(), // <--- TRUYỀN EMAIL VÀO ĐÂY
+          userEmail: _emailController.text.trim(),
         ),
       ),
     );

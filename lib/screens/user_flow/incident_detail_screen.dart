@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:geolocator/geolocator.dart'; // Đừng quên import gói này
 import 'dart:convert';
 import '../../models/incident_model.dart';
 
@@ -20,9 +21,9 @@ class IncidentDetailScreen extends StatefulWidget {
 class _IncidentDetailScreenState extends State<IncidentDetailScreen> {
   bool _isUpdating = false;
 
+  // --- HÀM 1: XEM ẢNH FULL MÀN HÌNH ---
   void _showFullImage(BuildContext context, String base64String) {
     if (base64String.isEmpty) return;
-
     showDialog(
       context: context,
       builder: (ctx) => Dialog(
@@ -38,13 +39,9 @@ class _IncidentDetailScreenState extends State<IncidentDetailScreen> {
               child: SizedBox(
                 width: double.infinity,
                 height: double.infinity,
-                child: Image.memory(
-                  base64Decode(base64String),
-                  fit: BoxFit.contain,
-                ),
+                child: Image.memory(base64Decode(base64String), fit: BoxFit.contain),
               ),
             ),
-            // Nút đóng
             SafeArea(
               child: Padding(
                 padding: const EdgeInsets.all(16.0),
@@ -63,6 +60,116 @@ class _IncidentDetailScreenState extends State<IncidentDetailScreen> {
     );
   }
 
+  // --- HÀM 2: CHECK-IN VỊ TRÍ (BẮT ĐẦU LÀM) ---
+  Future<void> _handleCheckIn() async {
+    setState(() => _isUpdating = true);
+    try {
+      // 1. Kiểm tra quyền
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          throw Exception("Bạn cần cấp quyền vị trí để check-in");
+        }
+      }
+      if (permission == LocationPermission.deniedForever) {
+        throw Exception("Quyền vị trí bị từ chối vĩnh viễn. Hãy mở cài đặt để cấp quyền.");
+      }
+
+      // 2. Lấy tọa độ
+      Position position = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.high);
+
+      // 3. Update Firebase
+      await FirebaseFirestore.instance
+          .collection('incidents')
+          .doc(widget.incident.id)
+          .update({
+        'status': 'Processing', // Chuyển sang đang xử lý
+        'checkInTime': DateTime.now().millisecondsSinceEpoch,
+        'checkInLocation': {
+          'latitude': position.latitude,
+          'longitude': position.longitude,
+        },
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("Đã Check-in thành công! Bắt đầu công việc.")));
+        Navigator.pop(context); // Quay lại để refresh list (hoặc có thể setState để vẽ lại UI)
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Lỗi Check-in: $e")));
+      }
+    } finally {
+      if (mounted) setState(() => _isUpdating = false);
+    }
+  }
+
+  // --- HÀM 3: YÊU CẦU VẬT TƯ ---
+  void _showMaterialRequestDialog() {
+    final TextEditingController _nameController = TextEditingController();
+    final TextEditingController _qtyController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          title: const Text('Đề xuất vật tư'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: _nameController,
+                decoration: const InputDecoration(labelText: 'Tên vật tư (VD: Dây điện)'),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: _qtyController,
+                decoration: const InputDecoration(labelText: 'Số lượng'),
+                keyboardType: TextInputType.number,
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Hủy')),
+            ElevatedButton(
+              onPressed: () async {
+                if (_nameController.text.isNotEmpty) {
+                  Navigator.pop(ctx); // Đóng popup trước
+                  await _saveMaterialRequest(_nameController.text, int.tryParse(_qtyController.text) ?? 1);
+                }
+              },
+              child: const Text('Gửi yêu cầu'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _saveMaterialRequest(String name, int qty) async {
+    try {
+      await FirebaseFirestore.instance
+          .collection('incidents')
+          .doc(widget.incident.id)
+          .collection('materials') // Tạo sub-collection mới
+          .add({
+        'name': name,
+        'quantity': qty,
+        'requestTime': DateTime.now().millisecondsSinceEpoch,
+        'status': 'Pending',
+      });
+      if(mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Đã gửi yêu cầu vật tư!")));
+      }
+    } catch (e) {
+      print("Lỗi gửi vật tư: $e");
+    }
+  }
+
+  // --- HÀM 4: BÁO CÁO HOÀN THÀNH ---
   Future<void> _markAsCompleted() async {
     final confirm = await showDialog<bool>(
       context: context,
@@ -106,6 +213,7 @@ class _IncidentDetailScreenState extends State<IncidentDetailScreen> {
     }
   }
 
+  // --- UI COMPONENTS ---
   Widget _buildStatusBadge(String status) {
     Color color;
     String label;
@@ -123,11 +231,13 @@ class _IncidentDetailScreenState extends State<IncidentDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    String timeString = "";
+    String timeString = "N/A";
     try {
-      timeString = widget.incident.timestamp.toString().substring(0, 16);
+      // Xử lý hiển thị thời gian an toàn hơn
+      var date = DateTime.fromMillisecondsSinceEpoch(int.parse(widget.incident.timestamp.toString()));
+      timeString = "${date.day}/${date.month}/${date.year} ${date.hour}:${date.minute}";
     } catch (e) {
-      timeString = "N/A";
+      timeString = widget.incident.timestamp.toString();
     }
 
     return Scaffold(
@@ -137,6 +247,7 @@ class _IncidentDetailScreenState extends State<IncidentDetailScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // --- ẢNH SỰ CỐ ---
             GestureDetector(
               onTap: () {
                 if (widget.incident.imageUrl.isNotEmpty) {
@@ -168,6 +279,7 @@ class _IncidentDetailScreenState extends State<IncidentDetailScreen> {
             ),
             const SizedBox(height: 20),
 
+            // --- HEADER ---
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -178,6 +290,7 @@ class _IncidentDetailScreenState extends State<IncidentDetailScreen> {
             ),
             const SizedBox(height: 10),
 
+            // --- THÔNG TIN CHI TIẾT ---
             Card(
               elevation: 2,
               child: Padding(
@@ -190,37 +303,68 @@ class _IncidentDetailScreenState extends State<IncidentDetailScreen> {
                     const Divider(),
                     _rowInfo(Icons.description, "Mô tả", widget.incident.description),
                     const Divider(),
-                    _rowInfo(Icons.access_time, "Thời gian", timeString),
+                    _rowInfo(Icons.access_time, "Thời gian báo", timeString),
+                    if (widget.incident.status != 'Pending') ...[ // Hiện thêm giờ check-in nếu có
+                      const Divider(),
+                      _rowInfo(Icons.timer, "Đã check-in", "Đã ghi nhận vị trí"),
+                    ]
                   ],
                 ),
               ),
             ),
             const SizedBox(height: 30),
 
-            if (!widget.isReadOnly && widget.incident.status == 'Processing')
-              SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: ElevatedButton.icon(
-                  onPressed: _isUpdating ? null : _markAsCompleted,
-                  icon: const Icon(Icons.check_circle),
-                  label: _isUpdating
-                      ? const CircularProgressIndicator(color: Colors.white)
-                      : const Text("BÁO CÁO HOÀN THÀNH CÔNG VIỆC"),
-                  style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
+            // --- LOGIC NÚT BẤM ---
+            if (!widget.isReadOnly) ...[
+
+              // TRƯỜNG HỢP 1: SỰ CỐ ĐANG CHỜ (PENDING) -> HIỆN NÚT CHECK-IN
+              if (widget.incident.status == 'Pending')
+                SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: ElevatedButton.icon(
+                    onPressed: _isUpdating ? null : _handleCheckIn,
+                    icon: const Icon(Icons.location_on),
+                    label: _isUpdating
+                        ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                        : const Text("CHECK-IN VỊ TRÍ & BẮT ĐẦU LÀM"),
+                    style: ElevatedButton.styleFrom(backgroundColor: Colors.blueAccent, foregroundColor: Colors.white),
+                  ),
                 ),
-              ),
 
-            if (widget.isReadOnly && widget.incident.status == 'Processing')
-              const Center(
-                  child: Text(
-                      "Đang chờ nhân viên kỹ thuật xử lý...",
-                      style: TextStyle(color: Colors.blue, fontStyle: FontStyle.italic)
-                  )
-              ),
+              // TRƯỜNG HỢP 2: ĐANG XỬ LÝ (PROCESSING) -> HIỆN NÚT VẬT TƯ & HOÀN THÀNH
+              if (widget.incident.status == 'Processing') ...[
+                // Nút yêu cầu vật tư
+                SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: OutlinedButton.icon(
+                    onPressed: _showMaterialRequestDialog,
+                    icon: const Icon(Icons.build),
+                    label: const Text("ĐỀ XUẤT VẬT TƯ"),
+                    style: OutlinedButton.styleFrom(foregroundColor: Colors.blue[800], side: BorderSide(color: Colors.blue[800]!)),
+                  ),
+                ),
+                const SizedBox(height: 15),
+                // Nút hoàn thành
+                SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: ElevatedButton.icon(
+                    onPressed: _isUpdating ? null : _markAsCompleted,
+                    icon: const Icon(Icons.check_circle),
+                    label: _isUpdating
+                        ? const CircularProgressIndicator(color: Colors.white)
+                        : const Text("BÁO CÁO HOÀN THÀNH CÔNG VIỆC"),
+                    style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
+                  ),
+                ),
+              ],
+            ],
 
-            if (widget.incident.status == 'Pending')
-              const Center(child: Text("Đang chờ Quản lý tiếp nhận...", style: TextStyle(color: Colors.orange, fontStyle: FontStyle.italic))),
+            // TRƯỜNG HỢP CHỈ XEM HOẶC ĐÃ XONG
+            if (widget.isReadOnly && widget.incident.status == 'Pending')
+              const Center(child: Text("Đang chờ nhân viên kỹ thuật tiếp nhận...", style: TextStyle(color: Colors.orange, fontStyle: FontStyle.italic))),
 
             if (widget.incident.status == 'Resolved')
               const Center(child: Text("Sự cố này đã được khắc phục xong.", style: TextStyle(color: Colors.green, fontStyle: FontStyle.italic, fontWeight: FontWeight.bold))),
